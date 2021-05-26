@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+	"time"
 
 	flags "github.com/jessevdk/go-flags"
 )
@@ -20,6 +21,7 @@ var (
 
 type options struct {
 	Parallels   int  `short:"p" long:"parallels" description:"Parallel degree of execution" default:"1"`
+	Delay   int  `short:"d" long:"delay" description:"Miliseconds to sleep after a job has been started" default:"0"`
 	ShowVersion bool `short:"v" long:"version" description:"Show version"`
 }
 
@@ -57,10 +59,10 @@ func main() {
 		panic(err)
 	}
 
-	ntimes(cnt, cmdName, cmdArgs, os.Stdin, os.Stdout, os.Stderr, opts.Parallels)
+	ntimes(cnt, cmdName, cmdArgs, os.Stdin, os.Stdout, os.Stderr, opts.Parallels, opts.Delay)
 }
 
-func ntimes(cnt int, cmdName string, cmdArgs []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, parallels int) {
+func ntimes(cnt int, cmdName string, cmdArgs []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, parallels int, delay int) {
 	var wg sync.WaitGroup
 
 	sema := make(chan bool, parallels)
@@ -86,6 +88,7 @@ func ntimes(cnt int, cmdName string, cmdArgs []string, stdin io.Reader, stdout i
 				panic(err)
 			}
 		}()
+		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
 
 	wg.Wait()
