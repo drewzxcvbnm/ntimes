@@ -21,23 +21,33 @@ var (
 	gitCommit = ""
 )
 
+func strip(st string) string {
+	return strings.ReplaceAll(st, " ", "")
+}
+
 func getDelayGenerator(delay string) func() int {
+	delay = strip(delay)
 	if !strings.Contains(delay,"(") {
 		d, _ := strconv.Atoi(delay)
 		return func() int {return d}
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	spl := strings.FieldsFunc(delay, func(c rune) bool {return c == '(' || c == ')'})
+	spl := strings.FieldsFunc(delay, func(c rune) bool {return c == '(' || c == ')' || c == ','})
 	if spl[0] == "exp" {
 		rate, _ := strconv.ParseFloat(spl[1], 64)
 		return func() int {return int(r.ExpFloat64()/rate)}
+	}
+	if spl[0] == "unif" {
+		from, _ := strconv.Atoi(spl[1])
+		to, _ := strconv.Atoi(spl[2])
+		return func() int {return from + r.Intn(to-from)}
 	}
 	panic("Cannot define delay generator")
 }
 
 type options struct {
 	Parallels   int  `short:"p" long:"parallels" description:"Parallel degree of execution" default:"1"`
-	Delay   string  `short:"d" long:"delay" description:"Miliseconds to sleep after a job has been started (can use exp(l))" default:"0"`
+	Delay   string  `short:"d" long:"delay" description:"Miliseconds to sleep after a job has been started: n, exp(l), unif(from,to)" default:"0"`
 	ShowVersion bool `short:"v" long:"version" description:"Show version"`
 }
 
