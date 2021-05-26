@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"strings"
+	"math/rand"
 
 	flags "github.com/jessevdk/go-flags"
 )
@@ -19,9 +21,23 @@ var (
 	gitCommit = ""
 )
 
+func getDelayGenerator(delay string) func() int {
+	if !strings.Contains(delay,"(") {
+		d, _ := strconv.Atoi(delay)
+		return func() int {return d}
+	}
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	spl := strings.FieldsFunc(delay, func(c rune) bool {return c == '(' || c == ')'})
+	if spl[0] == "exp" {
+		rate, _ := strconv.ParseFloat(spl[1], 64)
+		return func() int {return int(r.ExpFloat64()/rate)}
+	}
+	panic("Cannot define delay generator")
+}
+
 type options struct {
 	Parallels   int  `short:"p" long:"parallels" description:"Parallel degree of execution" default:"1"`
-	Delay   int  `short:"d" long:"delay" description:"Miliseconds to sleep after a job has been started" default:"0"`
+	Delay   string  `short:"d" long:"delay" description:"Miliseconds to sleep after a job has been started (can use exp(l))" default:"0"`
 	ShowVersion bool `short:"v" long:"version" description:"Show version"`
 }
 
@@ -59,10 +75,10 @@ func main() {
 		panic(err)
 	}
 
-	ntimes(cnt, cmdName, cmdArgs, os.Stdin, os.Stdout, os.Stderr, opts.Parallels, opts.Delay)
+	ntimes(cnt, cmdName, cmdArgs, os.Stdin, os.Stdout, os.Stderr, opts.Parallels, getDelayGenerator(opts.Delay))
 }
 
-func ntimes(cnt int, cmdName string, cmdArgs []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, parallels int, delay int) {
+func ntimes(cnt int, cmdName string, cmdArgs []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, parallels int, delay func() int) {
 	var wg sync.WaitGroup
 
 	sema := make(chan bool, parallels)
@@ -88,7 +104,9 @@ func ntimes(cnt int, cmdName string, cmdArgs []string, stdin io.Reader, stdout i
 				panic(err)
 			}
 		}()
-		time.Sleep(time.Duration(delay) * time.Millisecond)
+		del := delay()
+		//fmt.Println("Delay:",del)
+		time.Sleep(time.Duration(del) * time.Millisecond)
 	}
 
 	wg.Wait()
